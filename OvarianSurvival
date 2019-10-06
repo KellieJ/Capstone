@@ -22,4 +22,42 @@ library(survival)
 library(penalized)
 library(GenomicRanges)
 
+#loading TCGA dataset according to curatedOvarianData vignette#
 data(package="curatedOvarianData")
+data(TCGA_eset)
+TCGA_eset
+
+#Load datasets based on rules as discussed in curatedOvarianData vignette#
+source(system.file("extdata","patientselection.config",package="curatedOvarianData"))
+ls()
+
+#remove.samples and duplicates are too voluminous; filter created
+sapply(ls(), function(x) if(!x %in% c("remove.samples", "duplicates")) print(get(x)))
+source(system.file("extdata", "createEsetList.R", package ="curatedOvarianData"))
+
+#selected dataset from filtered dataset [dataset is Gene expression profile for predicting survival in advancedstage
+serous ovarian cancer across two independent datasets]
+GSE17260_eset
+
+#selecting 100 genes for computatation according to pensim vignette
+GSE17260_eset.sample <- GSE17260_eset[sample(1:nrow(GSE17260_eset), 100), ]
+GSE17260_eset.sample
+
+#following pensim vignette
+gene.quant <- apply(GSE17260_eset.sample, 1, quantile, probs=0.75)
+dat.filt <- GSE17260_eset.sample[gene.quant>log2(100), ]
+gene.iqr <- apply(dat.filt, 1, IQR)
+dat.filt <- as.matrix(dat.filt[gene.iqr>0.5, ])
+dat.filt <- t(dat.filt)
+dat.filt <- data.frame(dat.filt)
+
+#error message: Error in as.vector(data): no method for coercing this S4 class to a vector
+#Traceback:
+
+#1. apply(GSE17260_eset.sample, 1, quantile, probs = 0.75)
+#2. apply(GSE17260_eset.sample, 1, quantile, probs = 0.75)
+#3. as.matrix(X)
+#4. as.matrix.default(X)
+#5. array(x, c(length(x), 1L), if (!is.null(names(x))) list(names(x), 
+ .     NULL) else NULL)
+#6. as.vector(data)
