@@ -5,59 +5,64 @@ BiocManager::install("MultiAssayExperiment")
 BiocManager::install("curatedTCGAData")
 BiocManager::install("TCGAutils")
 BiocManager::install("pensim")
-BiocManager::install("curatedOvarianData")
 BiocManager::install("genefilter")
 BiocManager::install("logging")
 BiocManager::install("survival")
 BiocManager::install("GenomicRanges")
+BiocManager::install("Biobase")
 
 library(MultiAssayExperiment)
 library(curatedTCGAData)
 library(TCGAutils)
 library(pensim)
-library(curatedOvarianData)
 library(genefilter)
 library(logging)
 library(survival)
 library(penalized)
 library(GenomicRanges)
+library(Biobase)
 
-#loading TCGA dataset according to curatedOvarianData vignette#
-data(package="curatedOvarianData")
-data(TCGA_eset)
-TCGA_eset
+#isolating ovarian data#
+OV <- curatedTCGAData::curatedTCGAData("OV", "*", FALSE)
+OV
 
-#Load datasets based on rules as discussed in curatedOvarianData vignette#
-source(system.file("extdata","patientselection.config",package="curatedOvarianData"))
-ls()
+#Extract amplification assay#
+data2<- OV[, , "OV_GISTIC_AllByGene-20160128"]
+data2
 
-#remove.samples and duplicates are too voluminous; filter created
-sapply(ls(), function(x) if(!x %in% c("remove.samples", "duplicates")) print(get(x)))
-source(system.file("extdata", "createEsetList.R", package ="curatedOvarianData"))
+#creating survival dataset 
+survdata2<-colData(data2)
+survdata2
 
-#selected dataset from filtered dataset [dataset is Gene expression profile for predicting survival in advancedstage
-serous ovarian cancer across two independent datasets]
-GSE17260_eset
+#assay function
+data3<-assay(data2)
+data3
 
-#selecting 100 genes for computatation according to pensim vignette
-GSE17260_eset.sample <- GSE17260_eset[sample(1:nrow(GSE17260_eset), 100), ]
-GSE17260_eset.sample
-
-#following pensim vignette
-gene.quant <- apply(GSE17260_eset.sample, 1, quantile, probs=0.75)
-dat.filt <- GSE17260_eset.sample[gene.quant>log2(100), ]
+#filter data
+gene.quant <- apply(data3, 1, quantile, probs=0.75)
+dat.filt <- data3[gene.quant>log2(24776), ]
 gene.iqr <- apply(dat.filt, 1, IQR)
 dat.filt <- as.matrix(dat.filt[gene.iqr>0.5, ])
 dat.filt <- t(dat.filt)
 dat.filt <- data.frame(dat.filt)
 
-#error message: Error in as.vector(data): no method for coercing this S4 class to a vector
-#Traceback:
+#creating survival object#
+library(survival)
+surv.obj <- Surv(survdata2$days_to_death, survdata2$vital_status)
 
-#1. apply(GSE17260_eset.sample, 1, quantile, probs = 0.75)
-#2. apply(GSE17260_eset.sample, 1, quantile, probs = 0.75)
-#3. as.matrix(X)
-#4. as.matrix.default(X)
-#5. array(x, c(length(x), 1L), if (!is.null(names(x))) list(names(x), 
- .     NULL) else NULL)
-#6. as.vector(data)
+library(penalized)
+
+testfit <- optL2(response=surv.obj, penalized=dat.filt, fold=5,  maxlambda1=5, positive=FALSE, standardize=TRUE, trace=FALSE)
+#error 
+Error in optL2(response = surv.obj, penalized = dat.filt, fold = 5, maxlambda1 = 5, : unused argument (maxlambda1 = 5)
+Traceback:
+
+#after removing maxlambda1=5#
+testfit <- optL2(response=surv.obj, penalized=dat.filt, fold=5, positive=FALSE, standardize=TRUE, trace=FALSE)
+Error in if (is(response, "Surv") && any(as.vector(response) < 0)) stop("negative survival times"): missing value where TRUE/FALSE needed
+Traceback:
+
+1. optL2(response = surv.obj, penalized = dat.filt, fold = 5, positive = FALSE, 
+ .     standardize = TRUE, trace = FALSE)
+2. .checkinput(match.call(), parent.frame())
+
