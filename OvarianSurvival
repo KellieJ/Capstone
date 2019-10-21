@@ -23,20 +23,18 @@ library(GenomicRanges)
 library(Biobase)
 
 #isolating ovarian data#
-OV <- curatedTCGAData::curatedTCGAData("OV", "*", FALSE)
+OV <- curatedTCGAData::curatedTCGAData("OV", "GISTIC*", FALSE)
 OV
 
-#Extract amplification assay#
-data2<- OV[, , "OV_GISTIC_AllByGene-20160128"]
-data2
-
-#creating survival dataset 
-survdata2<-colData(data2)
+#creating survival dataset
+survdata2<-colData(OV)
 survdata2
 
+survdata2 <- survdata2[complete.cases(survdata2$days_to_death, survdata2$vital_status), ]
+ov2 <- OV[, rownames(colData(OV)) %in% rownames(survdata2) , ]
+
 #assay function
-data3<-assay(data2)
-data3
+data3 <- assay(ov2)
 
 #filter data
 gene.quant <- apply(data3, 1, quantile, probs=0.75)
@@ -47,22 +45,17 @@ dat.filt <- t(dat.filt)
 dat.filt <- data.frame(dat.filt)
 
 #creating survival object#
-library(survival)
-surv.obj <- Surv(survdata2$days_to_death, survdata2$vital_status)
-
-library(penalized)
+surv.obj <- Surv(survdata2$days_to_death/365, survdata2$vital_status)
 
 testfit <- optL2(response=surv.obj, penalized=dat.filt, fold=5,  maxlambda1=5, positive=FALSE, standardize=TRUE, trace=FALSE)
-#error 
-Error in optL2(response = surv.obj, penalized = dat.filt, fold = 5, maxlambda1 = 5, : unused argument (maxlambda1 = 5)
-Traceback:
+#error
+# Error in optL2(response = surv.obj, penalized = dat.filt, fold = 5, maxlambda1 = 5, : unused argument (maxlambda1 = 5)
+# Traceback:
 
 #after removing maxlambda1=5#
-testfit <- optL2(response=surv.obj, penalized=dat.filt, fold=5, positive=FALSE, standardize=TRUE, trace=FALSE)
-Error in if (is(response, "Surv") && any(as.vector(response) < 0)) stop("negative survival times"): missing value where TRUE/FALSE needed
-Traceback:
-
-1. optL2(response = surv.obj, penalized = dat.filt, fold = 5, positive = FALSE, 
- .     standardize = TRUE, trace = FALSE)
-2. .checkinput(match.call(), parent.frame())
+testfit <- penalized::optL2(response=surv.obj, penalized=dat.filt,
+fold=5, positive=FALSE, standardize=TRUE, trace=FALSE)
+#Error in structure(.Internal(La_qr(x)), useLAPACK = TRUE, class = "qr") : 
+  BLAS/LAPACK routine 'DGEQP3' gave error code -4
+#Error: Matrix inversion failed. Please increase lambda1 and/or lambda2
 
